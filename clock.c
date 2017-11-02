@@ -12,7 +12,7 @@ struct Time {
     uint8_t hours;
 };
 
-struct Time global_time = {
+volatile struct Time global_time = {
     .seconds = 0,
     .minutes = 0,
     .hours = 0,
@@ -133,15 +133,15 @@ void set_output(struct Time time){
     PORTB = output_hours;
 
     // Don't mess with pull-up settings
-    PORTD &= (PIND4 | PIND5);
-    PORTD |= ((output_mins & _BV(DREI)) && PIND4
-              | (output_mins & _BV(FUENF)) && PIND5);
+    PORTD &= ~(_BV(PIND4) | _BV(PIND5));
+    PORTD |= (((output_mins & _BV(DREI)) ? _BV(PIND4) : 0)
+              | ((output_mins & _BV(FUENF)) ? _BV(PIND5) : 0));
 
-    PORTC = ((output_mins & _BV(VOR)) && PINC1
-             | (output_mins & _BV(NACH)) && PINC2
-             | (output_mins & _BV(ZEHN)) && PINC3
-             | (output_mins & _BV(HALB)) && PINC4
-             | (output_mins & _BV(VIERTEL)) && PINC5);
+    PORTC = (((output_mins & _BV(VOR)) ? _BV(PINC1) : 0)
+             | ((output_mins & _BV(NACH)) ? _BV(PINC2) : 0)
+             | ((output_mins & _BV(ZEHN)) ? _BV(PINC3) : 0)
+             | ((output_mins & _BV(HALB)) ? _BV(PINC4) : 0)
+             | ((output_mins & _BV(VIERTEL)) ? _BV(PINC5) : 0));
 }
 
 struct Time increment_time(struct Time time){
@@ -191,8 +191,8 @@ ISR (PCINT2_vect) {
 ISR (TIMER1_COMPA_vect) {
     global_time.seconds = (global_time.seconds + 1) % 60;
     global_time.minutes = (global_time.minutes + (global_time.seconds == 0)) % 60;
-    global_time.hours = (global_time.hours + ((global_time.minutes == 0) &&
-                                (global_time.seconds == 0))) % 12;
+    global_time.hours = (global_time.hours +
+                         ((global_time.minutes == 0) && (global_time.seconds == 0))) % 12;
 
     set_output(global_time);
 }
