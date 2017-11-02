@@ -12,7 +12,7 @@ struct Time {
     uint8_t hours;
 };
 
-struct Time time = {
+struct Time global_time = {
     .seconds = 0,
     .minutes = 0,
     .hours = 0,
@@ -144,18 +144,17 @@ void set_output(struct Time time){
              | (output_mins & _BV(VIERTEL)) && PINC5);
 }
 
-void increment_time(){
+struct Time increment_time(struct Time time){
     // Increment time to nearest 5 minutes
-    cli(); // Disable interrupts
     time.seconds = 0;
     time.minutes = uiround((time.minutes + 5), 5) % 60;
     time.hours = (time.hours + (time.minutes < 5)) % 12;
-    sei(); // Enable interrupts
+
+    return time;
 }
 
-void decrement_time(){
+struct Time decrement_time(struct Time time){
     // Decrement time to nearest 5 minutes
-    cli(); // Disable interrupts
     if (time.minutes < 5)
         time.minutes = 55 + time.minutes;
     else
@@ -170,25 +169,30 @@ void decrement_time(){
 
     time.seconds = 0;
     time.minutes = uiround(time.minutes, 5);
-    sei(); // Enable interrupts
+
+    return time;
 }
 
 ISR (PCINT2_vect) {
+    cli(); // Disable interrupts
     // TODO: Better way of checking which one has changed
     if (PIND & _BV(PIND2)) {
-        increment_time();
+        global_time = increment_time(global_time);
     }
 
     if (PIND & _BV(PIND3)) {
-        decrement_time();
+        global_time = decrement_time(global_time);
     }
+
+    set_output(global_time);
+    sei(); // Enable interrupts
 }
 
 ISR (TIMER1_COMPA_vect) {
-    time.seconds = (time.seconds + 1) % 60;
-    time.minutes = (time.minutes + (time.seconds == 0)) % 60;
-    time.hours = (time.hours + ((time.minutes == 0) &&
-                                (time.seconds == 0))) % 12;
+    global_time.seconds = (global_time.seconds + 1) % 60;
+    global_time.minutes = (global_time.minutes + (global_time.seconds == 0)) % 60;
+    global_time.hours = (global_time.hours + ((global_time.minutes == 0) &&
+                                (global_time.seconds == 0))) % 12;
 
-    set_output(time);
+    set_output(global_time);
 }
