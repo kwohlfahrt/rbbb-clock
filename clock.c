@@ -27,6 +27,9 @@ struct Time time = {
 #define VIERTEL 6
 #define UHR     7
 
+// DDR? = Data direction (true for outputs)
+// PIN? = Value (if input)
+// PORT? = Value (if output) or pull-up activation (if input)
 void main(void){
     power_all_disable();
     power_usart0_enable();
@@ -34,15 +37,19 @@ void main(void){
 
     uart_init();
 
-    // Set C0 & C1 (A0 & A1) to input
-    DDRC &= ~(_BV(DDC0) | _BV(DDC1));
+    // Set D2 & D3 to input
+    DDRD = ~(_BV(PIND2) | _BV(PIND3));
     // Set pull-ups
-    PORTC |= _BV(PORTC0) | _BV(PORTC1);
+    PORTD = _BV(PIND2) | _BV(PIND3);
 
-    // Enable interrupts on PCMSK1
-    PCICR |= _BV(PCIE1);
-    // Enable interrupts on PCINT8 and PCINT9 (pins C0 and C1)
-    PCMSK1 |= _BV(PCINT8) | _BV(PCINT9);
+    // Other pins are all outputs, starting zero'd
+    DDRC = DDRB = ~0;
+    PORTC = PORTB = 0;
+
+    // Enable interrupts on PCINT19 and PCINT20 (pins D2 and D3)
+    PCMSK2 |= _BV(PCINT19) | _BV(PCINT20);
+    // Enable interrupts on PCMSK2
+    PCICR |= _BV(PCIE2);
 
     // Various interrupt times for prescaler 1024
     // 0.08-second interrupt
@@ -122,6 +129,19 @@ void set_output(struct Time time){
     uart_send(output_hours);
     uart_send(output_mins);
     uart_send(time.seconds);
+
+    PORTB = output_hours;
+
+    // Don't mess with pull-up settings
+    PORTD &= (PIND4 | PIND5);
+    PORTD |= ((output_mins & _BV(DREI)) && PIND4
+              | (output_mins & _BV(FUENF)) && PIND5);
+
+    PORTC = ((output_mins & _BV(VOR)) && PINC1
+             | (output_mins & _BV(NACH)) && PINC2
+             | (output_mins & _BV(ZEHN)) && PINC3
+             | (output_mins & _BV(HALB)) && PINC4
+             | (output_mins & _BV(VIERTEL)) && PINC5);
 }
 
 void increment_time(){
@@ -153,13 +173,13 @@ void decrement_time(){
     sei(); // Enable interrupts
 }
 
-ISR (PCINT1_vect) {
+ISR (PCINT2_vect) {
     // TODO: Better way of checking which one has changed
-    if (PINC & _BV(PINC0)) {
+    if (PIND & _BV(PIND2)) {
         increment_time();
     }
 
-    if (PINC & _BV(PINC1)) {
+    if (PIND & _BV(PIND3)) {
         decrement_time();
     }
 }
