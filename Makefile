@@ -3,6 +3,9 @@
 HOST_CFLAGS := -O2 -std=c11
 AVR_CFLAGS := -mmcu=atmega328p -DF_CPU=20000000 -DF_OSC=16000000 -Os -std=c11
 
+reader : reader.c
+	gcc $(HOST_CFLAGS) -o $@ $^
+
 %.elf: %.c uart.c uart.h
 	avr-gcc $(AVR_CFLAGS) $< uart.c -o $@
 
