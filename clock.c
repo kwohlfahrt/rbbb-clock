@@ -46,8 +46,8 @@ void main(void){
     DDRC = DDRB = ~0;
     PORTC = PORTB = 0;
 
-    // Enable interrupts on PCINT19 and PCINT20 (pins D2 and D3)
-    PCMSK2 |= _BV(PCINT19) | _BV(PCINT20);
+    // Enable interrupts on PCINT18 and PCINT19 (pins D2 and D3)
+    PCMSK2 |= _BV(PCINT18) | _BV(PCINT19);
     // Enable interrupts on PCMSK2
     PCICR |= _BV(PCIE2);
 
