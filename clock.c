@@ -4,7 +4,9 @@
 #include <avr/sleep.h>
 #include <avr/power.h>
 
+#ifdef DEBUG
 #include "uart.h"
+#endif
 
 struct Time {
     uint8_t seconds;
@@ -35,11 +37,15 @@ volatile uint8_t switch_pressed = 0;
 // PORT? = Value (if output) or pull-up activation (if input)
 void main(void){
     power_all_disable();
+#ifdef DEBUG
     power_usart0_enable();
+#endif
     power_timer1_enable();
     power_timer0_enable();
 
+#ifdef DEBUG
     uart_init();
+#endif
 
     // Set D2 & D3 to input
     DDRD = ~(_BV(PIND2) | _BV(PIND3));
@@ -128,9 +134,11 @@ void set_output(struct Time time){
         break;
     }
 
+#ifdef DEBUG
     uart_send(output_hours);
     uart_send(output_mins);
     uart_send(time.seconds);
+#endif
 
     PORTB = output_hours;
 
