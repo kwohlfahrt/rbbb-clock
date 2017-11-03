@@ -170,7 +170,7 @@ struct Time decrement_time(struct Time time){
     else
         time.minutes = time.minutes - 5;
 
-    if (time.minutes > 55) {
+    if (time.minutes >= 55) {
         if (time.hours == 0)
             time.hours = 11;
         else
