@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <stdbool.h>
 
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
@@ -19,7 +18,8 @@ volatile struct Time global_time = {
     .hours = 0,
 };
 
-volatile bool disable_switch = 0;
+// Number instead of bool to allow debounce time > 12.5ms
+volatile uint8_t switch_pressed = 0;
 
 #define ZEHN    0
 #define FUENF   1
@@ -55,10 +55,14 @@ void main(void){
     // Enable interrupts on PCMSK2
     PCICR |= _BV(PCIE2);
 
-    // Clock timer
     // Clock speed is 16_000_000 Hz
     // OCRnA value = (clk / prescaler * desired) - 1
+    // Debounce timer
+    OCR0A = 0xc2; // 12.5ms interrupt with prescaler == 1024 (0xFF max)
+    TIMSK0 |= _BV(OCIE0A); // Set interrupt on match to TIMER0_COMPA
+    TCCR0A |= _BV(WGM01); // Set CTC-OCR0A mode
 
+    // Clock timer
     OCR1A = 0x3D08; // 1s interrupt with prescaler == 1024
     TIMSK1 |= _BV(OCIE1A); // Set interrupt on match to TIMER1_COMPA
     TCCR1B |= _BV(WGM12); // Set CTC-OCR1A mode
@@ -172,25 +176,10 @@ struct Time decrement_time(struct Time time){
 }
 
 ISR (PCINT2_vect) {
-    if (disable_switch)
+    if (switch_pressed)
         return;
 
-    disable_switch = true;
-
-    if (PIND & _BV(PIND2)) {
-        global_time = increment_time(global_time);
-    }
-
-    if (PIND & _BV(PIND3)) {
-        global_time = decrement_time(global_time);
-    }
-
-    set_output(global_time);
-
-    // Debounce timer
-    OCR0A = 0xc2; // 12.5ms interrupt with prescaler == 1024 (0xFF max)
-    TIMSK0 |= _BV(OCIE0A); // Set interrupt on match to TIMER0_COMPA
-    TCCR0A |= _BV(WGM01); // Set CTC-OCR0A mode
+    switch_pressed = 1;
     TCCR0B |= _BV(CS02) | _BV(CS00); // Set prescaler to 1024 (starts timer)
 }
 
@@ -204,6 +193,18 @@ ISR (TIMER1_COMPA_vect) {
 }
 
 ISR (TIMER0_COMPA_vect) {
-    disable_switch = false;
-    TCCR0B &= ~(_BV(CS02) | _BV(CS00)); // Set prescaler to 0 (stops timer)
+    if (switch_pressed == 0) {
+        TCCR0B &= ~(_BV(CS02) | _BV(CS00)); // Set prescaler to 0 (stops timer)
+
+        if ((PIND & _BV(PIND2)) == 0) {
+            global_time = increment_time(global_time);
+            set_output(global_time);
+        }
+        if ((PIND & _BV(PIND3)) == 0) {
+            global_time = decrement_time(global_time);
+            set_output(global_time);
+        }
+    } else {
+        switch_pressed -= 1;
+    }
 }
