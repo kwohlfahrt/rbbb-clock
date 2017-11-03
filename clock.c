@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <avr/interrupt.h>
 #include <avr/sleep.h>
@@ -18,6 +19,8 @@ volatile struct Time global_time = {
     .hours = 0,
 };
 
+volatile bool disable_switch = 0;
+
 #define ZEHN    0
 #define FUENF   1
 #define VOR     2
@@ -34,6 +37,7 @@ void main(void){
     power_all_disable();
     power_usart0_enable();
     power_timer1_enable();
+    power_timer0_enable();
 
     uart_init();
 
@@ -51,20 +55,14 @@ void main(void){
     // Enable interrupts on PCMSK2
     PCICR |= _BV(PCIE2);
 
-    // Various interrupt times for prescaler 1024
-    // 0.08-second interrupt
-    //OCR1A = 0x4e1;
-    // 1-second interrupt
-    OCR1A = 0x3D08;
-    // 4-second interrupt
-    //OCR1A = 0xF423;
+    // Clock timer
+    // Clock speed is 16_000_000 Hz
+    // OCRnA value = (clk / prescaler * desired) - 1
 
-    // Set interrupt on match to OCIE1A
-    TIMSK1 |= _BV(OCIE1A);
-    // Set CTC-OCR1A mode
-    TCCR1B |= _BV(WGM12);
-    // Set prescaler to 1024 (starts timer)
-    TCCR1B |= _BV(CS12) | _BV(CS10);
+    OCR1A = 0x3D08; // 1s interrupt with prescaler == 1024
+    TIMSK1 |= _BV(OCIE1A); // Set interrupt on match to TIMER1_COMPA
+    TCCR1B |= _BV(WGM12); // Set CTC-OCR1A mode
+    TCCR1B |= _BV(CS12) | _BV(CS10); // Set prescaler to 1024 (starts timer)
 
     sleep_enable();
     while (1){
@@ -174,8 +172,11 @@ struct Time decrement_time(struct Time time){
 }
 
 ISR (PCINT2_vect) {
-    cli(); // Disable interrupts
-    // TODO: Better way of checking which one has changed
+    if (disable_switch)
+        return;
+
+    disable_switch = true;
+
     if (PIND & _BV(PIND2)) {
         global_time = increment_time(global_time);
     }
@@ -185,7 +186,12 @@ ISR (PCINT2_vect) {
     }
 
     set_output(global_time);
-    sei(); // Enable interrupts
+
+    // Debounce timer
+    OCR0A = 0xc2; // 12.5ms interrupt with prescaler == 1024 (0xFF max)
+    TIMSK0 |= _BV(OCIE0A); // Set interrupt on match to TIMER0_COMPA
+    TCCR0A |= _BV(WGM01); // Set CTC-OCR0A mode
+    TCCR0B |= _BV(CS02) | _BV(CS00); // Set prescaler to 1024 (starts timer)
 }
 
 ISR (TIMER1_COMPA_vect) {
@@ -195,4 +201,9 @@ ISR (TIMER1_COMPA_vect) {
                          ((global_time.minutes == 0) && (global_time.seconds == 0))) % 12;
 
     set_output(global_time);
+}
+
+ISR (TIMER0_COMPA_vect) {
+    disable_switch = false;
+    TCCR0B &= ~(_BV(CS02) | _BV(CS00)); // Set prescaler to 0 (stops timer)
 }
