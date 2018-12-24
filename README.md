@@ -24,3 +24,9 @@ The following pins control LEDs for minutes:
 ### Switches
 
 The increment/decrement switch connects `GND` to `D2`/`D3` respectively.
+
+## Installation
+
+Build the `firmware` directory, and then flash using:
+
+    avrdude -c arduino -p atmega328p -P /dev/ttyUSB0 -U flash:w:clock.hex

@@ -1,20 +1,9 @@
-.DEFAULT_GOAL := clock.hex
+.DEFAULT_GOAL := reader
 
-HOST_CFLAGS := -O2 -std=c11
-AVR_CFLAGS := -mmcu=atmega328p -DF_CPU=20000000 -DF_OSC=16000000 -Os -std=c11
+CFLAGS := -O2 -std=c11
 
 reader : reader.c
-	gcc $(HOST_CFLAGS) -o $@ $^
-
-%.elf: %.c uart.c uart.h
-	avr-gcc $(AVR_CFLAGS) $< uart.c -o $@
-
-%.hex: %.elf
-	avr-objcopy -O ihex $^ $@
-
-flash-%: %.hex
-	avrdude -c arduino -p atmega328p -P /dev/ttyUSB0 -U flash:w:$^
+	gcc $(CFLAGS) -o $@ $^
 
 clean:
-	rm -f *.hex *.elf
 	rm -f reader
